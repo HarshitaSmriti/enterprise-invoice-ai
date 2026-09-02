@@ -69,11 +69,12 @@ class DynamicDocumentPipeline:
                 total_words += len(words)
                 document_text_corpus.extend(words)
 
-                # A. Extract dynamic key-value pairs
-                kv_fields = extract_dynamic_key_values(words, boxes, page=page_idx)
-
-                # B. Extract dynamic tables
+                # A. Extract dynamic tables through geometric column analysis
                 tables = extract_dynamic_tables(words, boxes, page=page_idx)
+                table_boxes = [t["box"] for t in tables if "box" in t]
+
+                # B. Extract dynamic key-value pairs (excluding regions occupied by tables)
+                kv_fields = extract_dynamic_key_values(words, boxes, page=page_idx, exclude_boxes=table_boxes)
 
                 # C. Check if specialized LayoutLMv3 invoice models add value
                 # Used only when document domain is applicable (Invoice / GST)

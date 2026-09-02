@@ -213,3 +213,62 @@ def test_7_general_memo_extraction(dynamic_pipeline):
     assert len(table["rows"]) >= 3
 
 
+def test_8_unseen_it_incident_extraction(dynamic_pipeline):
+    """Verify completely unseen IT incident document extracts novel fields and asset table."""
+    inc_path = SAMPLE_DATA_DIR / "unseen_it_incident.png"
+    if not inc_path.exists():
+        pytest.skip(f"Incident sample {inc_path} not found")
+
+    result = dynamic_pipeline.process(inc_path)
+
+    # 1. Classification
+    assert result["document_type"] == "general_document"
+
+    # 2. Distinctive novel fields derived from the document
+    field_names = [f["name"] for f in result["fields"]]
+    assert "case_reference" in field_names
+    assert "priority_level" in field_names
+    assert "resolution_target" in field_names
+    assert "responsible_team" in field_names
+
+    # 3. Discovered asset table
+    assert len(result["tables"]) == 1
+    table = result["tables"][0]
+    assert table["columns"] == ["Asset Tag", "Location", "Owner", "Condition", "Last Checked"]
+    assert len(table["rows"]) == 4
+    assert table["rows"][0]["Asset Tag"] == "SRV-101"
+
+
+def test_9_document_with_fields_but_no_table(dynamic_pipeline):
+    """Verify document with key-values but NO table produces empty table list without errors."""
+    cert_path = SAMPLE_DATA_DIR / "fields_only_doc.png"
+    if not cert_path.exists():
+        pytest.skip(f"Certificate sample {cert_path} not found")
+
+    result = dynamic_pipeline.process(cert_path)
+
+    # 1. Fields extracted
+    field_names = [f["name"] for f in result["fields"]]
+    assert any("certificate_number" in fn or "issued_to" in fn or "accreditation" in fn for fn in field_names)
+
+    # 2. No tables must be discovered and no crash
+    assert len(result["tables"]) == 0
+
+
+def test_10_document_with_table_but_no_fields(dynamic_pipeline):
+    """Verify document with table grid but NO key-value pairs discovers table correctly."""
+    tbl_path = SAMPLE_DATA_DIR / "table_only_doc.png"
+    if not tbl_path.exists():
+        pytest.skip(f"Table sample {tbl_path} not found")
+
+    result = dynamic_pipeline.process(tbl_path)
+
+    # 1. Table discovered with geometric columns
+    assert len(result["tables"]) >= 1
+    table = result["tables"][0]
+    assert len(table["columns"]) >= 4
+    assert any("Sensor ID" in col or "Temperature" in col for col in table["columns"])
+    assert len(table["rows"]) >= 3
+
+
+
