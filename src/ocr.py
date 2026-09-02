@@ -249,13 +249,14 @@ def get_pp_structure():
 
 
 def get_direct_ocr():
-    """Lazy initialize and return singleton PaddleOCR direct engine."""
+    """Lazy initialize and return singleton PaddleOCR direct engine (lightweight mobile model)."""
     global _DIRECT_OCR_ENGINE
     if _DIRECT_OCR_ENGINE is not None:
         return _DIRECT_OCR_ENGINE
 
     kwargs = {
         "lang": "en",
+        "ocr_version": "PP-OCRv4",
         "use_doc_orientation_classify": False,
         "use_doc_unwarping": False,
         "use_textline_orientation": False,
@@ -315,28 +316,42 @@ def _run_engine(engine, image_path: str | Path) -> list[dict]:
 
 
 def ocr_image(image_path: str | Path) -> tuple[list[str], list[list[float]], list[bool], str]:
-    """Run OCR on image, trying PP-StructureV3 first with PaddleOCR direct fallback.
+    """Run OCR on image, selecting lightweight high-speed engine by default on CPU.
     
     Returns:
         (words, boxes, approx, engine_name)
     """
-    engine = get_pp_structure()
+    mode = os.getenv("OCR_ENGINE_MODE", "auto").lower()
+
+    if mode == "server":
+        primary_fn = get_pp_structure
+        primary_name = "pp_structure_v3"
+        fallback_fn = get_direct_ocr
+        fallback_name = "paddleocr_mobile"
+    else:
+        primary_fn = get_direct_ocr
+        primary_name = "paddleocr_mobile"
+        fallback_fn = get_pp_structure
+        fallback_name = "pp_structure_v3"
+
+    try:
+        engine = primary_fn()
+        records = _run_engine(engine, image_path)
+        if records:
+            words = [r["word"] for r in records]
+            boxes = [r["box"] for r in records]
+            approx = [r["confidence"] < 0.5 for r in records]
+            return words, boxes, approx, primary_name
+    except Exception:
+        pass
+
+    # Fallback
+    engine = fallback_fn()
     records = _run_engine(engine, image_path)
-
-    if records:
-        words = [r["word"] for r in records]
-        boxes = [r["box"] for r in records]
-        approx = [r["confidence"] < 0.5 for r in records]
-        return words, boxes, approx, "pp_structure_v3"
-
-    # Fallback to direct PaddleOCR
-    direct = get_direct_ocr()
-    records = _run_engine(direct, image_path)
-
     if not records:
         raise RuntimeError(f"OCR returned zero records for {image_path}")
 
     words = [r["word"] for r in records]
     boxes = [r["box"] for r in records]
     approx = [r["confidence"] < 0.5 for r in records]
-    return words, boxes, approx, "paddleocr_direct"
+    return words, boxes, approx, fallback_name
