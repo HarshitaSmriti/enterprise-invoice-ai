@@ -1,0 +1,34 @@
+﻿# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.class
+*.so
+
+# Caches and virtual environments
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+ENV/
+.env
+
+# Model training checkpoints & state caches (DO NOT COMMIT)
+encoded_cache/
+training_runs/
+training_runs_continued/
+checkpoint-*/
+optimizer.pt
+scheduler.pt
+scaler.pt
+rng_state.pth
+
+# Generated outputs & temp files
+outputs/_temp/
+*.log
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
