@@ -9,17 +9,24 @@ from .config import FIELD_MODEL_DIR, GST_MODEL_DIR, DEVICE
 _LOADED_MODELS = {}
 
 
+REQUIRED_MODEL_FILES = [
+    "config.json",
+    "model.safetensors",
+    "processor_config.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+]
+
+
 def load_layoutlm(model_dir: str | Path, model_name: str, device: str = DEVICE):
     """Load a LayoutLMv3 token classifier and processor from a local checkpoint."""
-    model_dir = Path(model_dir)
-    config_file = model_dir / "config.json"
-    weights_file = model_dir / "model.safetensors"
+    model_dir = Path(model_dir).resolve()
+    missing_files = [f for f in REQUIRED_MODEL_FILES if not (model_dir / f).exists()]
 
-    if not config_file.exists() or not weights_file.exists():
+    if missing_files:
         raise FileNotFoundError(
-            f"Required model files for {model_name} not found in: '{model_dir}'. "
-            f"Expected 'config.json' and 'model.safetensors'. "
-            "Ensure trained weights are downloaded or configure FIELD_MODEL_DIR / GST_MODEL_DIR."
+            f"Required files for {model_name} missing from '{model_dir}': {missing_files}. "
+            "Ensure the trained weights are mounted or set FIELD_MODEL_DIR / GST_MODEL_DIR."
         )
 
     processor = LayoutLMv3Processor.from_pretrained(str(model_dir), apply_ocr=False)

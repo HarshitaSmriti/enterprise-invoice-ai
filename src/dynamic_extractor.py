@@ -26,7 +26,7 @@ def classify_document_type(words: List[str]) -> str:
         return "incident_report"
     if any(k in text for k in ["tax invoice", "gstin", "bill to", "invoice no", "inv no", "bill no", "invoice date"]):
         return "invoice"
-    if any(k in text for k in ["cash receipt", "sales receipt", "register receipt", "cashier", "change due"]):
+    if any(k in text for k in ["cash receipt", "sales receipt", "register receipt", "cashier", "change due", "receipt id", "receipt"]):
         return "receipt"
     if any(k in text for k in ["agreement", "contract", "parties", "witnesseth", "terms & conditions"]):
         return "legal_agreement"
@@ -202,8 +202,8 @@ def extract_dynamic_tables(
         y_top = line["box"][1]
         line_text = line["text"]
 
-        # Stop at summary/notes footer
-        if re.search(r'\\b(TOTAL|SUBTOTAL|NOTES|ESTIMATED TOTAL|AUTHORIZED SIGNATURE|SUPERVISOR)\\b', line_text, re.IGNORECASE):
+        # Stop at summary/notes footer or key-value section
+        if re.search(r'\b(TOTAL|SUBTOTAL|TAX|SALES TAX|NOTES|ESTIMATED TOTAL|PAYMENT|AUTHORIZED SIGNATURE|SUPERVISOR|AUTH CODE|THANK YOU)\b', line_text, re.IGNORECASE):
             break
 
         if y_top < y_header_bottom:
@@ -233,6 +233,10 @@ def extract_dynamic_tables(
                     row_dict[best_col] = w
 
         non_empty = [v for v in row_dict.values() if v.strip()]
+        # If the line contains a colon and only 1 column has text, it is an attribute, not a data row
+        if ":" in line_text and len(non_empty) <= 1:
+            break
+
         if len(non_empty) >= 2 or (len(non_empty) >= 1 and len(row_dict[columns[0]]) > 2):
             table_rows.append(row_dict)
 

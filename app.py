@@ -130,6 +130,7 @@ with st.sidebar:
             "-- Choose a document --",
             "grocery_list.png (Grocery List / Non-Invoice)",
             "purchase_order.png (Purchase Order with Custom Tables)",
+            "retail_receipt.png (Retail Sales Receipt)",
             "irregular_form.png (Incident Form with Irregular Fields)",
             "8176011266.pdf (Real 1-Page GST Invoice)",
             "8176000040.pdf (Real 5-Page Multi-Page Document)",
@@ -142,6 +143,8 @@ with st.sidebar:
         selected_sample_path = SAMPLE_DATA_DIR / "grocery_list.png"
     elif sample_choice.startswith("purchase_order"):
         selected_sample_path = SAMPLE_DATA_DIR / "purchase_order.png"
+    elif sample_choice.startswith("retail_receipt"):
+        selected_sample_path = SAMPLE_DATA_DIR / "retail_receipt.png"
     elif sample_choice.startswith("irregular_form"):
         selected_sample_path = SAMPLE_DATA_DIR / "irregular_form.png"
     elif sample_choice.startswith("8176011266"):

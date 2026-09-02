@@ -167,3 +167,26 @@ def test_5_generic_json_schema_compliance():
     # Verify field schema
     for f in sample_doc["fields"]:
         assert "name" in f and "value" in f and "confidence" in f
+
+
+def test_6_retail_receipt_extraction(dynamic_pipeline):
+    """Verify retail receipt extracts custom receipt fields and items table."""
+    rcpt_path = SAMPLE_DATA_DIR / "retail_receipt.png"
+    if not rcpt_path.exists():
+        pytest.skip(f"Receipt sample {rcpt_path} not found")
+
+    result = dynamic_pipeline.process(rcpt_path)
+
+    # 1. Classification
+    assert result["document_type"] == "receipt"
+
+    # 2. Dynamic receipt fields
+    field_names = [f["name"] for f in result["fields"]]
+    assert any("receipt_id" in fn or "cashier" in fn or "date" in fn or "total_amount" in fn for fn in field_names)
+
+    # 3. Dynamic receipt items table
+    assert len(result["tables"]) >= 1
+    table = result["tables"][0]
+    assert len(table["columns"]) >= 2
+    assert len(table["rows"]) >= 3
+
