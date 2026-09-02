@@ -228,6 +228,7 @@ def get_pp_structure():
         "use_formula_recognition": False,
         "use_chart_recognition": False,
         "use_region_detection": False,
+        "text_recognition_batch_size": 16,
         "device": PADDLE_DEVICE,
     }
 
