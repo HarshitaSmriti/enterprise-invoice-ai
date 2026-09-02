@@ -1,4 +1,15 @@
-﻿# Enterprise Document AI — Intelligent Document Extraction System
+---
+title: Enterprise Invoice AI
+emoji: 🧾
+colorFrom: blue
+colorTo: indigo
+sdk: streamlit
+sdk_version: 1.42.0
+app_file: app.py
+pinned: false
+---
+
+# Enterprise Document AI — Intelligent Document Extraction System
 
 A production-ready Enterprise Document AI platform featuring dual LayoutLMv3 models (Universal Invoice & Indian GST), PP-StructureV3 OCR, geometric line-item table reconstruction, and schema-agnostic dynamic document understanding.
 
