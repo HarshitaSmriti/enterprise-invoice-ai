@@ -190,3 +190,26 @@ def test_6_retail_receipt_extraction(dynamic_pipeline):
     assert len(table["columns"]) >= 2
     assert len(table["rows"]) >= 3
 
+
+def test_7_general_memo_extraction(dynamic_pipeline):
+    """Verify arbitrary technical memo extracts custom fields and SLA matrix table."""
+    memo_path = SAMPLE_DATA_DIR / "general_memo.png"
+    if not memo_path.exists():
+        pytest.skip(f"Memo sample {memo_path} not found")
+
+    result = dynamic_pipeline.process(memo_path)
+
+    # 1. Classification
+    assert result["document_type"] in ["form", "general_document"]
+
+    # 2. Dynamic fields extracted
+    field_names = [f["name"] for f in result["fields"]]
+    assert any("document_ref" in fn or "author" in fn or "department" in fn for fn in field_names)
+
+    # 3. Custom SLA matrix table
+    assert len(result["tables"]) >= 1
+    table = result["tables"][0]
+    assert len(table["columns"]) >= 3
+    assert len(table["rows"]) >= 3
+
+
