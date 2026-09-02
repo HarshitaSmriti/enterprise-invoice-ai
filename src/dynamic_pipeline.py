@@ -75,12 +75,12 @@ class DynamicDocumentPipeline:
                 # B. Extract dynamic tables
                 tables = extract_dynamic_tables(words, boxes, page=page_idx)
 
-                # C. Check if invoice-specific table or LayoutLMv3 models add value
-                # If invoice keywords are detected or Model A/B produce high-confidence spans, harvest them
+                # C. Check if specialized LayoutLMv3 invoice models add value
+                # Used only when document domain is applicable (Invoice / GST)
                 doc_type_hint = classify_document_type(words)
                 ml_fields = []
 
-                if doc_type_hint == "invoice" or any(k in " ".join(words).lower() for k in ["total", "amount", "date", "no", "gst"]):
+                if doc_type_hint == "invoice":
                     try:
                         models = self._ensure_models()
                         preds_a = run_token_classifier(

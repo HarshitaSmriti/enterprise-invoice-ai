@@ -10,10 +10,14 @@ import torch
 
 # Base directories
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-FIELD_MODEL_DIR = PROJECT_ROOT / "field_level"
-GST_MODEL_DIR = PROJECT_ROOT / "gst_level"
-OUTPUTS_DIR = PROJECT_ROOT / "outputs"
-TEMP_DIR = OUTPUTS_DIR / "_temp"
+
+# Configurable model weight directories (supports environment variable overrides for deployment)
+MODEL_BASE_DIR = Path(os.getenv("MODEL_DIR", str(PROJECT_ROOT)))
+FIELD_MODEL_DIR = Path(os.getenv("FIELD_MODEL_DIR", str(MODEL_BASE_DIR / "field_level")))
+GST_MODEL_DIR = Path(os.getenv("GST_MODEL_DIR", str(MODEL_BASE_DIR / "gst_level")))
+
+OUTPUTS_DIR = Path(os.getenv("OUTPUTS_DIR", str(PROJECT_ROOT / "outputs")))
+TEMP_DIR = Path(os.getenv("TEMP_DIR", str(OUTPUTS_DIR / "_temp")))
 SAMPLE_DATA_DIR = PROJECT_ROOT / "sample_data"
 
 OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -24,9 +28,9 @@ SUPPORTED_EXTENSIONS = {
     ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"
 }
 
-# Runtime execution devices
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-PADDLE_DEVICE = "gpu:0" if torch.cuda.is_available() else "cpu"
+# Runtime execution devices (auto-detects CUDA/GPU with clean CPU fallback and env override)
+DEVICE = os.getenv("TORCH_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
+PADDLE_DEVICE = os.getenv("PADDLE_DEVICE", "gpu:0" if torch.cuda.is_available() else "cpu")
 
 # Environmental flags for Paddle / oneDNN
 os.environ["FLAGS_use_mkldnn"] = "0"
