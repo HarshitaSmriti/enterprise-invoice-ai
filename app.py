@@ -110,8 +110,17 @@ from src.config import (
     FIELD_MODEL_DIR,
     GST_MODEL_DIR,
 )
-from src.pipeline import InvoiceProcessingPipeline
 from src.pdf_utils import load_pages, validate_file
+
+def get_width_kwargs(stretch: bool = True) -> dict:
+    """Return compatibility kwargs for full-width elements without deprecation warnings."""
+    try:
+        import inspect
+        if "width" in inspect.signature(st.button).parameters:
+            return {"width": "stretch" if stretch else "content"}
+    except Exception:
+        pass
+    return {"use_container_width": stretch}
 
 # Streamlit Page Setup
 st.set_page_config(
@@ -188,8 +197,9 @@ st.markdown("""
 
 
 @st.cache_resource(show_spinner="Loading Invoice Extraction Pipeline & Models...")
-def get_invoice_pipeline() -> InvoiceProcessingPipeline:
+def get_invoice_pipeline():
     """Initialize and cache the production InvoiceProcessingPipeline."""
+    from src.pipeline import InvoiceProcessingPipeline
     return InvoiceProcessingPipeline(device=DEVICE)
 
 
@@ -266,7 +276,7 @@ with col_upload:
     btn_extract = st.button(
         "🚀 Extract Invoice",
         type="primary",
-        use_container_width=True,
+        **get_width_kwargs(),
         disabled=(target_path is None),
     )
 
@@ -278,7 +288,7 @@ with col_preview:
             st.image(
                 pages[0],
                 caption=f"Page 1 of {len(pages)}: {target_display_name}",
-                use_container_width=True,
+                **get_width_kwargs(),
             )
         except Exception as e:
             st.warning(f"Preview unavailable: {e}")
@@ -406,7 +416,7 @@ if "invoice_result" in st.session_state:
         if line_items:
             df_items = pd.DataFrame(line_items)
             display_cols = [c for c in ["description", "quantity", "unit_price", "amount", "page"] if c in df_items.columns]
-            st.dataframe(df_items[display_cols], use_container_width=True)
+            st.dataframe(df_items[display_cols], **get_width_kwargs())
             st.caption(f"Extracted **{len(line_items)}** item lines across document.")
         else:
             st.info("No structured line item table rows detected on this invoice.")
@@ -440,5 +450,5 @@ if "invoice_result" in st.session_state:
             data=json_bytes,
             file_name=f"{st.session_state.get('invoice_name', 'invoice')}_extracted.json",
             mime="application/json",
-            use_container_width=True,
+            **get_width_kwargs(),
         )
