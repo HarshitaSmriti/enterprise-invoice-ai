@@ -18,9 +18,42 @@ REQUIRED_MODEL_FILES = [
 ]
 
 
+def _ensure_preprocessor_config(model_dir: Path):
+    """Ensure preprocessor_config.json exists for LayoutLMv3Processor."""
+    preproc_file = model_dir / "preprocessor_config.json"
+    if not preproc_file.exists():
+        import json
+        proc_file = model_dir / "processor_config.json"
+        img_proc_data = {
+            "apply_ocr": False,
+            "do_normalize": True,
+            "do_rescale": True,
+            "do_resize": True,
+            "image_mean": [0.5, 0.5, 0.5],
+            "image_processor_type": "LayoutLMv3ImageProcessor",
+            "image_std": [0.5, 0.5, 0.5],
+            "resample": 2,
+            "rescale_factor": 0.00392156862745098,
+            "size": {"height": 224, "width": 224},
+            "tesseract_config": "",
+        }
+        if proc_file.exists():
+            try:
+                with open(proc_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if "image_processor" in data:
+                    img_proc_data.update(data["image_processor"])
+            except Exception:
+                pass
+        with open(preproc_file, "w", encoding="utf-8") as f:
+            json.dump(img_proc_data, f, indent=2)
+
+
 def load_layoutlm(model_dir: str | Path, model_name: str, device: str = DEVICE):
     """Load a LayoutLMv3 token classifier and processor from a local checkpoint."""
     model_dir = Path(model_dir).resolve()
+    _ensure_preprocessor_config(model_dir)
+
     missing_files = [f for f in REQUIRED_MODEL_FILES if not (model_dir / f).exists()]
 
     if missing_files:
