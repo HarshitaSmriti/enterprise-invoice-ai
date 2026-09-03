@@ -1,13 +1,9 @@
-rich==15.0.0
-markdown-it-py==4.2.0
-pygments==2.21.0
-mdurl==0.1.2
-transformers<4.45.0
+transformers>=4.40.0,<4.45.0
 torch
 safetensors
 PyMuPDF
 Pillow
-numpy<2.4
+numpy>=1.24.0,<2.0.0
 pandas
 paddlepaddle==3.2.2
 paddleocr==3.4.1
