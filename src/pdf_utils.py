@@ -53,7 +53,7 @@ def load_pages(input_path: str | Path, pdf_dpi: int = 170) -> list[Image.Image]:
 
         for page in doc:
             pix = page.get_pixmap(dpi=pdf_dpi, alpha=False)
-            image = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
+            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             pages.append(image)
 
     except Exception as exc:

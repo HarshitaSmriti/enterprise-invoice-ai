@@ -15,7 +15,7 @@ def normalize_box_1000(box, width: int, height: int) -> list[int]:
     ]
 
 
-def make_chunks(n: int, chunk_size: int = 180, overlap: int = 30) -> list[tuple[int, int]]:
+def make_chunks(n: int, chunk_size: int = 350, overlap: int = 25) -> list[tuple[int, int]]:
     """Partition n word tokens into overlapping chunks to fit within 512 subwords."""
     if n <= chunk_size:
         return [(0, n)]

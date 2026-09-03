@@ -27,6 +27,7 @@ class InvoiceProcessingPipeline:
         start_time = time.perf_counter()
         doc_path = validate_file(input_path)
 
+        from concurrent.futures import ThreadPoolExecutor
         page_images = load_pages(doc_path)
         page_results = []
 
@@ -36,27 +37,63 @@ class InvoiceProcessingPipeline:
             temp_page_file = TEMP_DIR / f"_temp_p_{page_no}_{int(time.time()*1000)}.png"
 
             try:
-                page_image.save(temp_page_file, format="PNG")
-                words, boxes, approx, ocr_engine = ocr_image(temp_page_file)
+                words, boxes = [], []
+                ocr_engine = "digital_pdf_fast"
+
+                # Fast-path for digital PDFs: extract text & exact 1000-scaled bounding boxes in ~15ms
+                if doc_path.suffix.lower() == ".pdf":
+                    try:
+                        import fitz
+                        with fitz.open(str(doc_path)) as pdf_doc:
+                            if page_no - 1 < len(pdf_doc):
+                                pdf_page = pdf_doc[page_no - 1]
+                                pw, ph = pdf_page.rect.width, pdf_page.rect.height
+                                raw_words = pdf_page.get_text("words")
+                                if len(raw_words) >= 15:
+                                    for x0, y0, x1, y1, text, b, l, widx in raw_words:
+                                        t = text.strip()
+                                        if t:
+                                            words.append(t)
+                                            boxes.append([
+                                                max(0, min(1000, int(round(x0 / pw * 1000)))),
+                                                max(0, min(1000, int(round(y0 / ph * 1000)))),
+                                                max(0, min(1000, int(round(x1 / pw * 1000)))),
+                                                max(0, min(1000, int(round(y1 / ph * 1000)))),
+                                            ])
+                    except Exception:
+                        words, boxes = [], []
+
+                # Fallback to OCR for scanned PDFs or raster image uploads
+                if not words:
+                    page_image.save(temp_page_file, format="PNG")
+                    words, boxes, approx, ocr_engine = ocr_image(temp_page_file)
+
                 all_words.extend(words)
 
-                # 1. Model A inference
-                preds_a = run_token_classifier(
-                    page_image, words, boxes,
-                    self.models["model_a"],
-                    self.models["processor_a"],
-                    self.models["id2label_a"],
-                    device=self.device,
-                )
+                # Concurrent forward passes for Model A (universal) and Model B (GST)
+                def _run_a():
+                    return run_token_classifier(
+                        page_image, words, boxes,
+                        self.models["model_a"],
+                        self.models["processor_a"],
+                        self.models["id2label_a"],
+                        device=self.device,
+                    )
 
-                # 2. Model B inference
-                preds_b = run_token_classifier(
-                    page_image, words, boxes,
-                    self.models["model_b"],
-                    self.models["processor_b"],
-                    self.models["id2label_b"],
-                    device=self.device,
-                )
+                def _run_b():
+                    return run_token_classifier(
+                        page_image, words, boxes,
+                        self.models["model_b"],
+                        self.models["processor_b"],
+                        self.models["id2label_b"],
+                        device=self.device,
+                    )
+
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    fa = executor.submit(_run_a)
+                    fb = executor.submit(_run_b)
+                    preds_a = fa.result()
+                    preds_b = fb.result()
 
                 spans_a = build_spans(preds_a)
                 spans_b = build_spans(preds_b)

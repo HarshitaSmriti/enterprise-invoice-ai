@@ -20,7 +20,17 @@ def run_token_classifier(
     device: str = DEVICE,
 ) -> list[dict]:
     """Execute token classification on an image and word boxes using LayoutLMv3."""
+    import os
+    from PIL import Image
+    if device == "cpu" and torch.get_num_threads() < 4:
+        try:
+            torch.set_num_threads(os.cpu_count() or 4)
+        except Exception:
+            pass
+
     width, height = image.size
+    # Pre-downsample to 224x224 thumbnail once to bypass expensive PIL resizing in every chunk
+    thumb = image.resize((224, 224), Image.Resampling.BILINEAR) if image.size != (224, 224) else image
     predictions = []
 
     for start, end in make_chunks(len(words)):
@@ -32,34 +42,28 @@ def run_token_classifier(
             for b in chunk_boxes
         ]
 
+        # Dynamic padding avoids unnecessary O(N^2) attention computation on padding tokens
         encoded = processor(
-            image,
+            thumb,
             chunk_words,
             boxes=normalized_boxes,
             truncation=True,
-            padding="max_length",
-            max_length=512,
+            padding=True,
             return_tensors="pt",
         )
 
-        encoded = {
+        tensor_inputs = {
             k: v.to(device)
             for k, v in encoded.items()
             if hasattr(v, "to")
         }
 
-        outputs = model(**encoded)
+        outputs = model(**tensor_inputs)
         probs = torch.softmax(outputs.logits, dim=-1)
         conf, pred_ids = probs.max(dim=-1)
 
         try:
-            mapping = processor.tokenizer(
-                chunk_words,
-                boxes=normalized_boxes,
-                truncation=True,
-                padding="max_length",
-                max_length=512,
-            ).word_ids()
+            mapping = encoded.word_ids()
         except Exception:
             mapping = [None] * pred_ids.shape[1]
 
