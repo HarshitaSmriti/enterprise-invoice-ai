@@ -286,10 +286,16 @@ with col_upload:
 
     if uploaded_file is not None:
         target_path = TEMP_DIR / f"upload_{uploaded_file.name}"
+        data = uploaded_file.getvalue()
         with open(target_path, "wb") as f:
-            f.write(uploaded_file.getvalue())
+            f.write(data)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except Exception:
+                pass
         target_display_name = uploaded_file.name
-        st.success(f"Uploaded: **{uploaded_file.name}** ({len(uploaded_file.getvalue()) / 1024:.1f} KB)")
+        st.success(f"Uploaded: **{uploaded_file.name}** ({len(data) / 1024:.1f} KB)")
     elif selected_sample_path is not None and selected_sample_path.exists():
         target_path = selected_sample_path
         target_display_name = selected_sample_path.name

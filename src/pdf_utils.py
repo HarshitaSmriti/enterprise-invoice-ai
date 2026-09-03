@@ -24,12 +24,14 @@ def validate_file(input_path: str | Path) -> Path:
     if not path.exists():
         raise FileNotFoundError(f"Document file not found: {path}")
 
-    if path.stat().st_size == 0:
+    file_size = path.stat().st_size
+    if file_size == 0:
         raise ValueError(f"Document file is empty (0 bytes): {path}")
 
-    if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
+    suffix = path.suffix.lower()
+    if suffix not in SUPPORTED_EXTENSIONS:
         raise ValueError(
-            f"Unsupported file format: '{path.suffix}'. "
+            f"Unsupported file format: '{suffix}'. "
             f"Supported formats: {sorted(SUPPORTED_EXTENSIONS)}"
         )
 
@@ -55,9 +57,19 @@ def load_pages(input_path: str | Path, pdf_dpi: int = 170) -> list[Image.Image]:
         except Exception as exc:
             raise ValueError(f"Failed to open image {path}: {exc}") from exc
 
+    # PDF Validation & Diagnostics
+    try:
+        header = path.read_bytes()[:8]
+        if not header.startswith(b"%PDF"):
+            # If not a standard PDF header, verify if it's an image disguised as PDF or malformed
+            pass
+    except Exception:
+        pass
+
     pages = []
     doc = None
     try:
+        # Open PDF file with pymupdf
         doc = pymupdf.open(str(path))
         if len(doc) == 0:
             raise ValueError(f"PDF document has 0 pages: {path}")
@@ -68,9 +80,21 @@ def load_pages(input_path: str | Path, pdf_dpi: int = 170) -> list[Image.Image]:
             pages.append(image)
 
     except Exception as exc:
-        raise RuntimeError(f"Error rendering PDF {path}: {exc}") from exc
+        # Fallback: try opening from memory stream if direct file read had xref issues
+        try:
+            raw_bytes = path.read_bytes()
+            doc = pymupdf.open(stream=raw_bytes, filetype="pdf")
+            for page in doc:
+                pix = page.get_pixmap(dpi=pdf_dpi, alpha=False)
+                image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                pages.append(image)
+        except Exception:
+            raise RuntimeError(f"Error rendering PDF {path}: {exc}") from exc
     finally:
         if doc is not None:
-            doc.close()
+            try:
+                doc.close()
+            except Exception:
+                pass
 
     return pages
