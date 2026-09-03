@@ -1,11 +1,14 @@
 """Unified Enterprise Invoice Processing Pipeline."""
 
 import time
+import gc
 from pathlib import Path
 import json
+from concurrent.futures import ThreadPoolExecutor
+import torch
 
 from .config import CANONICAL_FIELDS, TEMP_DIR, OUTPUTS_DIR, DEVICE, PADDLE_DEVICE
-from .pdf_utils import load_pages, validate_file
+from .pdf_utils import get_document_page_count, load_single_page, validate_file
 from .ocr import ocr_image
 from .model_loader import get_models
 from .field_extractor import run_token_classifier, build_spans
@@ -16,25 +19,34 @@ from .validation import final_consistency_check
 
 
 class InvoiceProcessingPipeline:
-    """Production invoice extraction pipeline coordinator."""
+    """Production invoice extraction pipeline with streaming page-by-page bounded memory."""
 
     def __init__(self, device: str = DEVICE):
         self.device = device
         self.models = get_models(device=device)
 
-    def process(self, input_path: str | Path) -> dict:
-        """Run complete extraction pipeline on uploaded document."""
+    def process(self, input_path: str | Path, progress_callback=None) -> dict:
+        """Run complete extraction pipeline with streaming page-by-page memory management.
+        
+        Args:
+            input_path: Path to the invoice PDF or image.
+            progress_callback: Optional callable(current_page, total_pages, message) for progress updates.
+        """
         start_time = time.perf_counter()
         doc_path = validate_file(input_path)
+        total_pages = get_document_page_count(doc_path)
 
-        from concurrent.futures import ThreadPoolExecutor
-        page_images = load_pages(doc_path)
         page_results = []
-
         all_words = []
+        page_errors = []
 
-        for page_no, page_image in enumerate(page_images, start=1):
+        for page_idx in range(total_pages):
+            page_no = page_idx + 1
+            if progress_callback:
+                progress_callback(page_no, total_pages, f"Processing page {page_no}/{total_pages}...")
+
             temp_page_file = TEMP_DIR / f"_temp_p_{page_no}_{int(time.time()*1000)}.png"
+            page_image = None
 
             try:
                 words, boxes = [], []
@@ -52,8 +64,8 @@ class InvoiceProcessingPipeline:
                         except Exception:
                             pass
                         with pymupdf.open(str(doc_path)) as pdf_doc:
-                            if page_no - 1 < len(pdf_doc):
-                                pdf_page = pdf_doc[page_no - 1]
+                            if page_idx < len(pdf_doc):
+                                pdf_page = pdf_doc[page_idx]
                                 pw, ph = pdf_page.rect.width, pdf_page.rect.height
                                 raw_words = pdf_page.get_text("words")
                                 if len(raw_words) >= 15:
@@ -69,6 +81,9 @@ class InvoiceProcessingPipeline:
                                             ])
                     except Exception:
                         words, boxes = [], []
+
+                # Render single page image on demand
+                page_image = load_single_page(doc_path, page_index=page_idx)
 
                 # Fallback to OCR for scanned PDFs or raster image uploads
                 if not words:
@@ -105,12 +120,12 @@ class InvoiceProcessingPipeline:
                 spans_a = build_spans(preds_a)
                 spans_b = build_spans(preds_b)
 
-                # 3. Merge fields & OCR structural evidence
+                # Merge fields & OCR structural evidence
                 fields, metadata, money_diag, gstins = merge_page_fields(
                     spans_a + spans_b, words, boxes
                 )
 
-                # 4. Table & line-item reconstruction
+                # Table & line-item reconstruction
                 line_items = reconstruct_line_items(words, boxes)
                 for item in line_items:
                     item["page"] = page_no
@@ -130,16 +145,33 @@ class InvoiceProcessingPipeline:
                     },
                 })
 
+            except Exception as page_exc:
+                page_errors.append({
+                    "page": page_no,
+                    "error": str(page_exc),
+                    "status": "skipped",
+                })
             finally:
                 if temp_page_file.exists():
                     try:
                         temp_page_file.unlink()
                     except Exception:
                         pass
-                try:
-                    page_image.close()
-                except Exception:
-                    pass
+                if page_image is not None:
+                    try:
+                        page_image.close()
+                    except Exception:
+                        pass
+                    del page_image
+
+                # Garbage collection every 5 pages or for large documents
+                if page_no % 5 == 0 or total_pages > 10:
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+
+        if progress_callback:
+            progress_callback(total_pages, total_pages, "Reconciling multi-page invoice...")
 
         # 5. Merge multi-page results
         merged = merge_page_results(page_results)
@@ -166,6 +198,11 @@ class InvoiceProcessingPipeline:
         canonical["_diagnostics"]["source_file"] = Path(input_path).name
         canonical["_diagnostics"]["device"] = self.device
         canonical["_diagnostics"]["paddle_device"] = PADDLE_DEVICE
+        canonical["_diagnostics"]["total_pages"] = total_pages
+        canonical["_diagnostics"]["pages_processed"] = len(page_results)
+        canonical["_diagnostics"]["pages_failed"] = len(page_errors)
+        if page_errors:
+            canonical["_diagnostics"]["page_errors"] = page_errors
         canonical["_diagnostics"]["total_seconds"] = round(time.perf_counter() - start_time, 3)
 
         return canonical

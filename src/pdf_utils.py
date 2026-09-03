@@ -37,6 +37,41 @@ def validate_file(input_path: str | Path) -> Path:
 
     return path
 
+def get_document_page_count(input_path: str | Path) -> int:
+    """Return total number of pages in PDF or 1 for image."""
+    path = validate_file(input_path)
+    if path.suffix.lower() != ".pdf":
+        return 1
+    try:
+        with pymupdf.open(str(path)) as doc:
+            return len(doc)
+    except Exception:
+        raw_bytes = path.read_bytes()
+        with pymupdf.open(stream=raw_bytes, filetype="pdf") as doc:
+            return len(doc)
+
+
+def load_single_page(input_path: str | Path, page_index: int = 0, pdf_dpi: int = 170) -> Image.Image:
+    """Render and return ONLY a single page as a PIL RGB Image, conserving memory."""
+    path = validate_file(input_path)
+    if path.suffix.lower() != ".pdf":
+        with Image.open(path) as img:
+            return img.convert("RGB")
+
+    try:
+        with pymupdf.open(str(path)) as doc:
+            if page_index >= len(doc):
+                raise IndexError(f"Page index {page_index} out of range (document has {len(doc)} pages)")
+            page = doc[page_index]
+            pix = page.get_pixmap(dpi=pdf_dpi, alpha=False)
+            return Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    except Exception as exc:
+        raw_bytes = path.read_bytes()
+        with pymupdf.open(stream=raw_bytes, filetype="pdf") as doc:
+            page = doc[page_index]
+            pix = page.get_pixmap(dpi=pdf_dpi, alpha=False)
+            return Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
 
 def load_pages(input_path: str | Path, pdf_dpi: int = 170) -> list[Image.Image]:
     """Render PDF pages or load single image into a list of RGB PIL Images.

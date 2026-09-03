@@ -132,7 +132,7 @@ from src.config import (
     FIELD_MODEL_DIR,
     GST_MODEL_DIR,
 )
-from src.pdf_utils import load_pages, validate_file
+from src.pdf_utils import get_document_page_count, load_single_page, validate_file
 
 def get_width_kwargs(stretch: bool = True) -> dict:
     """Return compatibility kwargs for full-width elements without deprecation warnings."""
@@ -312,12 +312,17 @@ with col_preview:
     st.subheader("Document Preview")
     if target_path is not None and target_path.exists():
         try:
-            pages = load_pages(target_path)
+            total_doc_pages = get_document_page_count(target_path)
+            preview_page = load_single_page(target_path, page_index=0)
             st.image(
-                pages[0],
-                caption=f"Page 1 of {len(pages)}: {target_display_name}",
+                preview_page,
+                caption=f"Page 1 of {total_doc_pages}: {target_display_name}",
                 **get_width_kwargs(),
             )
+            try:
+                preview_page.close()
+            except Exception:
+                pass
         except Exception as e:
             st.warning(f"Preview unavailable: {e}")
     else:
@@ -328,18 +333,28 @@ st.divider()
 # Step 2: End-to-End Extraction Execution
 if btn_extract and target_path is not None:
     pipeline = get_invoice_pipeline()
-    with st.spinner("Processing invoice through PP-StructureV3 and LayoutLMv3 models..."):
-        try:
-            t0 = time.perf_counter()
-            invoice_result = pipeline.process(target_path)
-            elapsed = round(time.perf_counter() - t0, 2)
-            invoice_result["_diagnostics"]["processing_time"] = elapsed
-            st.session_state["invoice_result"] = invoice_result
-            st.session_state["invoice_name"] = target_display_name
-            st.success(f"✅ Extraction completed in **{elapsed}s**!")
-        except Exception as err:
-            st.error(f"Extraction failed: {err}")
-            st.exception(err)
+    progress_bar = st.progress(0.0)
+    status_text = st.empty()
+
+    def update_progress(curr, total, msg):
+        pct = max(0.0, min(1.0, curr / max(total, 1)))
+        progress_bar.progress(pct)
+        status_text.info(f"⏳ **{msg}** ({curr}/{total})")
+
+    try:
+        t0 = time.perf_counter()
+        invoice_result = pipeline.process(target_path, progress_callback=update_progress)
+        elapsed = round(time.perf_counter() - t0, 2)
+        invoice_result["_diagnostics"]["processing_time"] = elapsed
+        st.session_state["invoice_result"] = invoice_result
+        st.session_state["invoice_name"] = target_display_name
+        progress_bar.progress(1.0)
+        status_text.empty()
+        st.success(f"✅ Extraction completed in **{elapsed}s** across {invoice_result['_diagnostics'].get('total_pages', 1)} pages!")
+    except Exception as err:
+        status_text.empty()
+        st.error(f"Extraction failed: {err}")
+        st.exception(err)
 
 # Step 3: Display Extracted Results
 if "invoice_result" in st.session_state:
