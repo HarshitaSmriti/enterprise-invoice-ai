@@ -30,9 +30,13 @@ import torch  # noqa: F401
 # Headless server cv2 guard: handle missing GUI libraries (libGL/libglib) gracefully
 try:
     import cv2  # noqa: F401
+    if cv2.__spec__ is None:
+        import importlib.machinery
+        cv2.__spec__ = importlib.machinery.ModuleSpec(name="cv2", loader=None)
 except Exception:
     import sys
     import types
+    import importlib.machinery
     from PIL import Image
 
     class Cv2Fallback(types.ModuleType):
@@ -89,7 +93,11 @@ except Exception:
             return lambda *args, **kwargs: None
 
     import numpy as np
-    sys.modules["cv2"] = Cv2Fallback("cv2")
+    fallback = Cv2Fallback("cv2")
+    fallback.__spec__ = importlib.machinery.ModuleSpec(name="cv2", loader=None)
+    fallback.__file__ = "cv2.py"
+    fallback.__path__ = []
+    sys.modules["cv2"] = fallback
 
 from src.config import (
     SUPPORTED_EXTENSIONS,
