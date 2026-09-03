@@ -62,7 +62,12 @@ def load_layoutlm(model_dir: str | Path, model_name: str, device: str = DEVICE):
             "Ensure the trained weights are mounted or set FIELD_MODEL_DIR / GST_MODEL_DIR."
         )
 
-    processor = LayoutLMv3Processor.from_pretrained(str(model_dir), apply_ocr=False)
+    try:
+        processor = LayoutLMv3Processor.from_pretrained(str(model_dir), apply_ocr=False)
+    except Exception:
+        # Fallback to standard LayoutLMv3 base processor if tokenizer.json serialization format conflicts
+        processor = LayoutLMv3Processor.from_pretrained("microsoft/layoutlmv3-base", apply_ocr=False)
+
     model = LayoutLMv3ForTokenClassification.from_pretrained(str(model_dir))
     model.to(device)
     model.eval()
