@@ -1,10 +1,19 @@
 import io
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", message=".*fitz.*")
+
+import pymupdf
 try:
-    import pymupdf as fitz
-    fitz.mupdf_display_errors(False)
+    pymupdf.TOOLS.mupdf_display_errors(False)
 except Exception:
-    import fitz
+    try:
+        pymupdf.mupdf_display_errors(False)
+    except Exception:
+        pass
+
 from PIL import Image
 from .config import SUPPORTED_EXTENSIONS
 
@@ -49,7 +58,7 @@ def load_pages(input_path: str | Path, pdf_dpi: int = 170) -> list[Image.Image]:
     pages = []
     doc = None
     try:
-        doc = fitz.open(str(path))
+        doc = pymupdf.open(str(path))
         if len(doc) == 0:
             raise ValueError(f"PDF document has 0 pages: {path}")
 

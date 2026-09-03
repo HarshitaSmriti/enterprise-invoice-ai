@@ -43,12 +43,15 @@ class InvoiceProcessingPipeline:
                 # Fast-path for digital PDFs: extract text & exact 1000-scaled bounding boxes in ~15ms
                 if doc_path.suffix.lower() == ".pdf":
                     try:
+                        import warnings
+                        warnings.filterwarnings("ignore", category=DeprecationWarning)
+                        warnings.filterwarnings("ignore", message=".*fitz.*")
+                        import pymupdf
                         try:
-                            import pymupdf as fitz
-                            fitz.mupdf_display_errors(False)
+                            pymupdf.TOOLS.mupdf_display_errors(False)
                         except Exception:
-                            import fitz
-                        with fitz.open(str(doc_path)) as pdf_doc:
+                            pass
+                        with pymupdf.open(str(doc_path)) as pdf_doc:
                             if page_no - 1 < len(pdf_doc):
                                 pdf_page = pdf_doc[page_no - 1]
                                 pw, ph = pdf_page.rect.width, pdf_page.rect.height

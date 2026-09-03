@@ -29,7 +29,18 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 import io
 import json
 import time
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", message=".*fitz.*")
+warnings.filterwarnings("ignore", message=".*No ccache found.*")
+
+try:
+    import pymupdf
+    pymupdf.TOOLS.mupdf_display_errors(False)
+except Exception:
+    pass
 
 import pandas as pd
 from PIL import Image
