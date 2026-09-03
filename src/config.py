@@ -7,9 +7,9 @@ import os
 # Set PaddleX flags to avoid foreign server network checks and timeouts in cloud environments
 os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 os.environ["PADDLE_PDX_EAGER_INIT"] = "False"
-os.environ["PADDLE_PDX_MODEL_SOURCE"] = "huggingface"
-
+import os
 import re
+import tempfile
 from pathlib import Path
 import torch
 
@@ -21,12 +21,17 @@ MODEL_BASE_DIR = Path(os.getenv("MODEL_DIR", str(PROJECT_ROOT)))
 FIELD_MODEL_DIR = Path(os.getenv("FIELD_MODEL_DIR", str(MODEL_BASE_DIR / "field_level")))
 GST_MODEL_DIR = Path(os.getenv("GST_MODEL_DIR", str(MODEL_BASE_DIR / "gst_level")))
 
-OUTPUTS_DIR = Path(os.getenv("OUTPUTS_DIR", str(PROJECT_ROOT / "outputs")))
+# Writable temporary directories in /tmp
+_tmp_base = Path(tempfile.gettempdir())
+OUTPUTS_DIR = Path(os.getenv("OUTPUTS_DIR", str(_tmp_base / "invoice_ai_outputs")))
 TEMP_DIR = Path(os.getenv("TEMP_DIR", str(OUTPUTS_DIR / "_temp")))
 SAMPLE_DATA_DIR = PROJECT_ROOT / "sample_data"
 
-OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
-TEMP_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 # File formats supported
 SUPPORTED_EXTENSIONS = {
@@ -39,8 +44,11 @@ PADDLE_DEVICE = os.getenv("PADDLE_DEVICE", "gpu:0" if torch.cuda.is_available() 
 
 # Environmental flags for Paddle / oneDNN
 os.environ["FLAGS_use_mkldnn"] = "0"
-os.environ["FLAGS_allocator_strategy"] = "auto_growth"
+os.environ["FLAGS_allocator_strategy"] = "naive_best_fit"
 os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
+os.environ["PADDLE_DISABLE_DNNL"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
 # Canonical target field list
 CANONICAL_FIELDS = [

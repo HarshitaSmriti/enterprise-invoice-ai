@@ -10,10 +10,21 @@ End-to-End Invoice Processing with:
 """
 
 import os
-# Set PaddleX flags before any imports to prevent network connectivity checks and timeouts
+import tempfile
+from pathlib import Path
+
+# Streamlit Cloud memory limits: prevent Paddle/PyTorch OOM and OpenMP fork crashes
 os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
 os.environ["PADDLE_PDX_EAGER_INIT"] = "False"
-os.environ["PADDLE_PDX_MODEL_SOURCE"] = "huggingface"
+os.environ["PADDLE_PDX_CACHE_HOME"] = str(Path(tempfile.gettempdir()) / "paddlex_cache")
+os.environ["FLAGS_use_mkldnn"] = "0"
+os.environ["FLAGS_allocator_strategy"] = "naive_best_fit"
+os.environ["FLAGS_fraction_of_gpu_memory_to_use"] = "0.0"
+os.environ["PADDLE_DISABLE_DNNL"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 import io
 import json
