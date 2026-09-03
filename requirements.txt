@@ -1,11 +1,11 @@
---extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.0.0
-torchvision>=0.15.0
-transformers>=4.40.0
-safetensors>=0.4.0
-PyMuPDF>=1.24.0
-Pillow>=10.0.0
-numpy>=1.24.0,<2.4.0
-pandas>=2.0.0
+torch
+torchvision
+transformers
+safetensors
+PyMuPDF
+Pillow
+numpy<2.4
+pandas
 paddlepaddle==3.2.2
 paddleocr==3.4.1
+opencv-python-headless
