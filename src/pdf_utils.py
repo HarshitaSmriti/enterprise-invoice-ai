@@ -1,8 +1,10 @@
-"""PDF and document rendering utilities using PyMuPDF (fitz) and Pillow."""
-
 import io
 from pathlib import Path
-import fitz
+try:
+    import pymupdf as fitz
+    fitz.mupdf_display_errors(False)
+except Exception:
+    import fitz
 from PIL import Image
 from .config import SUPPORTED_EXTENSIONS
 
