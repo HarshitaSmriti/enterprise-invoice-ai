@@ -16,6 +16,70 @@ import numpy as np
 
 # Ensure torch is loaded before paddle to avoid Windows DLL issues
 import torch  # noqa: F401
+
+# Headless server cv2 guard: handle missing GUI libraries (libGL/libglib) gracefully
+try:
+    import cv2  # noqa: F401
+except Exception:
+    import sys
+    import types
+    from PIL import Image
+
+    class Cv2Fallback(types.ModuleType):
+        __file__ = "cv2.py"
+        IMREAD_COLOR = 1
+        IMREAD_GRAYSCALE = 0
+        IMREAD_UNCHANGED = -1
+        COLOR_BGR2GRAY = 6
+        COLOR_BGR2RGB = 4
+        COLOR_RGB2BGR = 4
+        INTER_NEAREST = 0
+        INTER_LINEAR = 1
+        INTER_CUBIC = 2
+        INTER_AREA = 3
+        INTER_LANCZOS4 = 4
+        BORDER_CONSTANT = 0
+        BORDER_REPLICATE = 1
+        BORDER_REFLECT = 2
+        BORDER_REFLECT_101 = 4
+        LINE_AA = 16
+        FONT_HERSHEY_SIMPLEX = 0
+
+        @staticmethod
+        def imread(path, flags=1):
+            with Image.open(path) as img:
+                arr = np.array(img.convert("RGB"))
+                return arr[:, :, ::-1] if flags == 1 else arr
+
+        @staticmethod
+        def imdecode(buf, flags=1):
+            import io
+            with Image.open(io.BytesIO(buf)) as img:
+                arr = np.array(img.convert("RGB"))
+                return arr[:, :, ::-1] if flags == 1 else arr
+
+        @staticmethod
+        def cvtColor(src, code):
+            if code in (4,):
+                return src[:, :, ::-1]
+            elif code == 6:
+                return np.dot(src[..., :3], [0.114, 0.587, 0.299]).astype(np.uint8)
+            return src
+
+        @staticmethod
+        def resize(src, dsize, fx=0, fy=0, interpolation=1):
+            h, w = src.shape[:2]
+            new_w, new_h = dsize if dsize != (0, 0) else (int(w * fx), int(h * fy))
+            pil_img = Image.fromarray(src)
+            return np.array(pil_img.resize((new_w, new_h), Image.Resampling.BILINEAR))
+
+        def __getattr__(self, name):
+            if name.startswith("__"):
+                raise AttributeError(name)
+            return lambda *args, **kwargs: None
+
+    sys.modules["cv2"] = Cv2Fallback("cv2")
+
 import paddle
 import paddleocr
 from paddleocr import PPStructureV3, PaddleOCR
