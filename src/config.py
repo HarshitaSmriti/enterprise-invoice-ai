@@ -4,6 +4,11 @@ Defines model directories, canonical schemas, regexes, and device parameters.
 """
 
 import os
+# Set PaddleX flags to avoid foreign server network checks and timeouts in cloud environments
+os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
+os.environ["PADDLE_PDX_EAGER_INIT"] = "False"
+os.environ["PADDLE_PDX_MODEL_SOURCE"] = "huggingface"
+
 import re
 from pathlib import Path
 import torch

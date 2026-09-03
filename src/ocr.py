@@ -5,6 +5,11 @@ materialized JSON, and legacy walkers, returning normalized bounding boxes and w
 """
 
 import os
+# Set PaddleX flags before importing paddleocr to avoid network connectivity checks and timeouts
+os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
+os.environ["PADDLE_PDX_EAGER_INIT"] = "False"
+os.environ["PADDLE_PDX_MODEL_SOURCE"] = "huggingface"
+
 import json
 from pathlib import Path
 import numpy as np

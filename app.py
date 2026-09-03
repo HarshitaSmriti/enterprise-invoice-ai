@@ -9,6 +9,12 @@ End-to-End Invoice Processing with:
 6. Interactive Streamlit Results Display & JSON Export
 """
 
+import os
+# Set PaddleX flags before any imports to prevent network connectivity checks and timeouts
+os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
+os.environ["PADDLE_PDX_EAGER_INIT"] = "False"
+os.environ["PADDLE_PDX_MODEL_SOURCE"] = "huggingface"
+
 import io
 import json
 import time
